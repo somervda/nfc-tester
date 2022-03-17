@@ -38,13 +38,15 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PN532.git"
 
 import time
-from machine import I2C
+from machine import I2C, Pin
 from digitalio import Direction
 from micropython import const
 from adafruit_pn532 import PN532, BusyError, _reset
 
 # pylint: disable=bad-whitespace
 _I2C_ADDRESS = const(0x24)
+
+_NOT_BUSY = const(0x01)
 
 
 class PN532_I2C(PN532):
@@ -59,10 +61,22 @@ class PN532_I2C(PN532):
         self._irq = irq
         self._req = req
         if reset:
-            _reset(reset)
+            # Changed this logic so it is not circuit python dependent (No use of direction)
+            # Do the reset at the I2c level
+            if self.debug:
+                print("reset")
+            reset_pin = Pin(reset, Pin.OUT)
+            reset_pin.value(1)
+            time.sleep(0.1)
+            reset_pin.value(0)
+            time.sleep(0.5)
+            reset_pin.value(1)
+            time.sleep(0.1)
+            # _reset(reset)
         # self._i2c = I2C.SoftI2C(i2c, _I2C_ADDRESS)
         self._i2c = i2c
-        super().__init__(debug=debug, reset=reset)
+        # call super.__init__ without reset pin (To get around circuitpython pin specifics)
+        super().__init__(debug=debug)
 
     def _wakeup(self):  # pylint: disable=no-self-use
         """Send any special commands/data to wake up PN532"""
@@ -77,6 +91,7 @@ class PN532_I2C(PN532):
 
     def _wait_ready(self, timeout=1):
         """Poll PN532 if status byte is ready, up to `timeout` seconds"""
+        # Updated to use time_ns vs time.monotonic of circuitpython
         status = bytearray(1)
         timestamp = time.time_ns()/1000000000
         if self.debug:
@@ -100,25 +115,29 @@ class PN532_I2C(PN532):
     def _read_data(self, count):
         """Read a specified count of bytes from the PN532."""
         if self.debug:
-            print("Build read request buff")
+            print("_read_data")
         # Build a read request frame.
         frame = bytearray(count+1)
-        # with self._i2c as i2c:
-        status_byte = self._i2c.readfrom(_I2C_ADDRESS, 1)
-        # i2c.readinto(frame, end=1)  # read status byte!
-        # if frame[0] != 0x01:             # not ready
-        if status_byte != 0x01:             # not ready
+        status_byte = bytearray(1)
+        # Updated to use readfrom_into (Circutpython readfrom not supported)
+        self._i2c.readfrom_into(_I2C_ADDRESS, status_byte)
+        if self.debug:
+            print("_read_data status_byte: ", status_byte)
+        if status_byte[0] != _NOT_BUSY:             # not ready
+            if self.debug:
+                print("_read_data busy_error ")
             raise BusyError
-        # i2c.readinto(frame)        # ok get the data, plus statusbyte
+        if self.debug:
+            print("_read_data readfrom_into")
+        # Updated to use readfrom_into (Circutpython readfrom not supported)
         self._i2c.readfrom_into(_I2C_ADDRESS, frame)
         if self.debug:
-            print("Reading: ", [hex(i) for i in frame[1:]])
-        else:
-            time.sleep(0.1)
+            print("_read_data frame: ", frame)
         return frame[1:]   # don't return the status byte
 
     def _write_data(self, framebytes):
         """Write a specified count of bytes to the PN532"""
-        # with self._i2c as i2c:
-        # i2c.write(framebytes)
+        # Updated to using writeto - circuitpython write not supported
+        if self.debug:
+            print('_write data: ', [hex(i) for i in framebytes])
         self._i2c.writeto(_I2C_ADDRESS, framebytes)

@@ -334,10 +334,14 @@ class PN532:
         """Call PN532 GetFirmwareVersion function and return a tuple with the IC,
         Ver, Rev, and Support values.
         """
+        if self.debug:
+            print("Get firmware version")
         response = self.call_function(
             _COMMAND_GETFIRMWAREVERSION, 4, timeout=0.5)
         if response is None:
             raise RuntimeError('Failed to detect the PN532')
+        if self.debug:
+            print("Get firmware version response:", tuple(response))
         return tuple(response)
 
     def SAM_configuration(self):   # pylint: disable=invalid-name
