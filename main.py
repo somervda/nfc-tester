@@ -53,7 +53,7 @@ while True:
     if last_uid == uid:
         pass
     else:
-        print("Found card with UID:", [hex(i) for i in uid])
+        # Process new RFID card
         oled.fill(0)
         # Format short string showing UID
         suid = ""
@@ -66,9 +66,29 @@ while True:
         oled.text('UID Found', 0, 0)
         oled.text(suid, 0, 10)
         oled.show()
-        print("len(suid):", len(suid))
-        if len(suid) == 7:
-            data0 = pn532.mifare_classic_read_block(0)
-            print("Data0:", [hex(i) for i in data0])
+        # For NCF cards pull data to check for NDEF record
+        # print("len(uid):", len(uid))
+        if len(uid) == 7:
+            # Get first 176 bytes of data on the card
+            cardData = pn532.mifare_classic_read_block(0)
+            for blockNumber in range(3, 43, 4):
+                cardData += pn532.mifare_classic_read_block(blockNumber)
+            # Hex dump
+            # Parphrased from https://www.geoffreybrown.com/blog/a-hexdump-program-in-python/
+            print()
+            print("Hex Dump for ", [hex(i) for i in uid])
+            n = 0
+            for hd in range(11):
+                b = cardData[(hd*16):((hd*16)+16)]
+                s1 = " ".join([f"{i:02x}" for i in b])  # hex string
+                # insert extra space between groups of 8 hex values
+                s1 = s1[0:23] + " " + s1[23:]
+                # ascii string; chained comparison
+                s2 = "".join([chr(i) if 32 <= i <= 127 else "." for i in b])
+                print(f"{n * 16:08x}  {s1:<48}  |{s2}|")
+                n += 1
+        else:
+            print()
+            print("Found card with UID:", [hex(i) for i in uid])
 
     last_uid = uid
