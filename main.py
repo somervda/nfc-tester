@@ -1,6 +1,9 @@
 # hiletgo esp32 pn532 rfid test script
 import machine
 import ssd1306
+# Uses Adafruit PN532 NFC/RFID control library.
+# Author: Tony DiCola
+# pn_532_i2c wrapper updated by David Somerville to work with Micropython
 import pn532_i2c
 import time
 from micropython import const
@@ -63,5 +66,9 @@ while True:
         oled.text('UID Found', 0, 0)
         oled.text(suid, 0, 10)
         oled.show()
+        print("len(suid):", len(suid))
+        if len(suid) == 7:
+            data0 = pn532.mifare_classic_read_block(0)
+            print("Data0:", [hex(i) for i in data0])
 
     last_uid = uid
