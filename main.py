@@ -131,13 +131,19 @@ while True:
                             sURL = "https://"
                         sURL += (cardData[27: uriLength -
                                           1 + 27]).decode('utf-8')
+                        oled.text(sURL, 0, 20)
+                        oled.show()
                         #  Call the URL
                         try:
                             print("Calling: ", sURL)
                             resp1 = MicroWebCli.GETRequest(
                                 sURL, connTimeoutSec=3)
+                            oled.text("Success!", 0, 30)
+                            oled.show()
                         except:
                             print("http get failed")
+                            oled.text("URL Failed!", 0, 30)
+                            oled.show()
         else:
             print()
             print("Found card with UID:", [hex(i) for i in uid])
