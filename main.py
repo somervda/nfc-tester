@@ -13,7 +13,16 @@ import gc
 from microWebCli import MicroWebCli
 
 ALEXA_LAMP_URL = "http://192.168.1.115:1880/alexa"
-# ALEXA_LAMP_URL = "http://192.168.1.115:1880"
+
+NDEF_URIPREFIX_HTTP_WWWDOT = const(0x01)
+NDEF_URIPREFIX_HTTPS_WWWDOT = const(0x02)
+NDEF_URIPREFIX_HTTP = const(0x03)
+NDEF_URIPREFIX_HTTPS = const(0x04)
+
+TLV_START = const(0x00)
+TLV_TYPE_NDEF = const(0x03)
+NDEF_HEADER_WELL_KNOWN_TYPE = const(0xd1)
+NDEF_PAYLOAD_TYPE_URI = const(0x55)
 
 
 # Set up I2C buss and scan for devices
@@ -94,31 +103,41 @@ while True:
         # print("len(uid):", len(uid))
         if len(uid) == 7:
             # # Get first 176 bytes of data on the card
-            # cardData = pn532.mifare_classic_read_block(0)
-            # for blockNumber in range(3, 43, 4):
-            #     cardData += pn532.mifare_classic_read_block(blockNumber)
-            # # Hex dump
-            # # Parphrased from https://www.geoffreybrown.com/blog/a-hexdump-program-in-python/
-            # print()
-            # print("Hex Dump for ", [hex(i) for i in uid])
-            # n = 0
-            # for hd in range(11):
-            #     b = cardData[(hd*16):((hd*16)+16)]
-            #     s1 = " ".join([f"{i:02x}" for i in b])  # hex string
-            #     # insert extra space between groups of 8 hex values
-            #     s1 = s1[0:23] + " " + s1[23:]
-            #     # ascii string; chained comparison
-            #     s2 = "".join([chr(i) if 32 <= i <= 127 else "." for i in b])
-            #     print(f"{n * 16:08x}  {s1:<48}  |{s2}|")
-            #     n += 1
+            try:
+                cardData = pn532.mifare_classic_read_block(0)
+                for blockNumber in range(3, 43, 4):
+                    cardData += pn532.mifare_classic_read_block(blockNumber)
+            except:
+                print("Failed block read")
+                pass
             print("Found card with UID:", [hex(i) for i in uid], uid)
-            #  Only turn on alexa light for specific card uid
-            if (uid == bytearray(b'\x040\xa3\xfa\xe8k\x81')):
-                try:
-                    resp1 = MicroWebCli.GETRequest(
-                        ALEXA_LAMP_URL, connTimeoutSec=3)
-                except:
-                    print("http get failed")
+            #  If card has a NDEF URL data
+            #  First check card has a TLV block
+            if (cardData[19] == TLV_START and cardData[20] == TLV_TYPE_NDEF):
+                # Check TLV block has a NDEF record
+                if (cardData[22] == NDEF_HEADER_WELL_KNOWN_TYPE and cardData[23] == 0x01):
+                    # Check if data is URI
+                    if (cardData[25] == NDEF_PAYLOAD_TYPE_URI):
+                        # Get URI length
+                        uriLength = cardData[24]
+                        # Add the URL prefix
+                        if cardData[26] == NDEF_URIPREFIX_HTTP_WWWDOT:
+                            sURL = "http://www."
+                        if cardData[26] == NDEF_URIPREFIX_HTTPS_WWWDOT:
+                            sURL = "https://www."
+                        if cardData[26] == NDEF_URIPREFIX_HTTP:
+                            sURL = "http://"
+                        if cardData[26] == NDEF_URIPREFIX_HTTPS:
+                            sURL = "https://"
+                        sURL += (cardData[27: uriLength -
+                                          1 + 27]).decode('utf-8')
+                        #  Call the URL
+                        try:
+                            print("Calling: ", sURL)
+                            resp1 = MicroWebCli.GETRequest(
+                                sURL, connTimeoutSec=3)
+                        except:
+                            print("http get failed")
         else:
             print()
             print("Found card with UID:", [hex(i) for i in uid])
