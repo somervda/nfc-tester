@@ -65,10 +65,15 @@ if not sta_if.isconnected():
         print("*", end="")
         pass
 print('network config:', sta_if.ifconfig())
+oled.fill(0)
+oled.text("Network OK", 0, 10)
+oled.text(sta_if.ifconfig()[0], 0, 20)
+oled.show()
+
 gc.collect()
 
 # Start listening for a card
-time.sleep_ms(1000)
+time.sleep_ms(3000)
 print("Waiting for RFID/NFC card...")
 gc.collect()
 last_uid = None
